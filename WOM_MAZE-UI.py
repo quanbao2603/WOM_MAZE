@@ -12,6 +12,7 @@ ctk.set_appearance_mode('light')
 ctk.set_default_color_theme('green')
 
 class PathVisualizerApp(ctk.CTk):
+    # --- Khởi tạo và UI ---
     def __init__(self):
         super().__init__()
         self.title('WOM MAZE SOLVER')
@@ -56,7 +57,7 @@ class PathVisualizerApp(ctk.CTk):
         self.combo_maze.grid(row=6, column=0, padx=10, pady=(0,10))
         # Special Maze Variant
         ctk.CTkLabel(control, text='Maze Variant', text_color='white').grid(row=7, column=0, pady=(10,2), padx=10)
-        self.combo_variant = ctk.CTkComboBox(control, width=260, values=['EcoBot Navigator','Mud Maze','Blind Maze','Zero'])
+        self.combo_variant = ctk.CTkComboBox(control, width=260, values=['EcoBot Navigator','Mud Maze','Zero'])
         self.combo_variant.set('EcoBot Navigator')
         self.combo_variant.grid(row=8, column=0, padx=10, pady=(0,10))
         # bind maze variant change to toggle New Maze Window button
@@ -155,6 +156,7 @@ class PathVisualizerApp(ctk.CTk):
         # set initial button state
         self.on_variant_change()
 
+    # --- Xử lý sự kiện UI ---
     def on_algo_change(self, choice):
         if self.combo_algo.get() == 'A*':
             self.combo_heur.configure(state='normal')
@@ -211,7 +213,9 @@ class PathVisualizerApp(ctk.CTk):
 
     def draw_grid(self, n): 
         """Draw n x n grid with square cells and decorate margins."""
+        # Delete everything including start/end icons
         self.canvas.delete('all')
+        
         w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
         # determine square cell size
         cell = min(w / n, h / n)
@@ -237,7 +241,9 @@ class PathVisualizerApp(ctk.CTk):
                 y1 = pad_y + row * cell
                 x2 = x1 + cell
                 y2 = y1 + cell
-                rect = self.canvas.create_rectangle(x1, y1, x2, y2, fill='white', outline='gray')
+                # Set initial color based on grid_data if it exists
+                fill_color = 'black' if self.grid_data and self.grid_data[row][col] == 1 else 'white'
+                rect = self.canvas.create_rectangle(x1, y1, x2, y2, fill=fill_color, outline='gray')
                 self.cells[(row, col)] = rect
         # store grid metrics for click mapping
         self.cell_size = cell
@@ -256,14 +262,14 @@ class PathVisualizerApp(ctk.CTk):
             # Draw flag pole
             self.canvas.create_line(x + cell*0.2, y + cell*0.2, 
                                   x + cell*0.2, y + cell*0.8, 
-                                  fill='black', width=2)
+                                  fill='black', width=2, tags='start_icon')
             # Draw flag
             points = [
                 x + cell*0.2, y + cell*0.2,  # pole top
                 x + cell*0.7, y + cell*0.4,  # flag tip
                 x + cell*0.2, y + cell*0.6   # pole middle
             ]
-            self.canvas.create_polygon(points, fill='green', outline='black')
+            self.canvas.create_polygon(points, fill='green', outline='black', tags='start_icon')
             
         # Draw end icon (target)
         if self.end in self.cells:
@@ -271,15 +277,21 @@ class PathVisualizerApp(ctk.CTk):
             y = pad_y + self.end[0] * cell
             center_x = x + cell/2
             center_y = y + cell/2
-            # Draw concentric circles
-            for r in range(int(cell*0.4), 0, -int(cell*0.1)):
-                self.canvas.create_oval(center_x-r, center_y-r, 
-                                     center_x+r, center_y+r, 
-                                     outline='red', width=2)
+            
+            # Draw 3 concentric circles
+            radius = cell * 0.4
+            for i in range(3):
+                r = radius * (1 - i * 0.2)
+                if r > 1:  # Only draw if radius is greater than 1 pixel
+                    self.canvas.create_oval(center_x-r, center_y-r, 
+                                         center_x+r, center_y+r, 
+                                         outline='red', width=2, tags='end_icon')
+            
             # Draw center dot
-            self.canvas.create_oval(center_x-cell*0.1, center_y-cell*0.1,
-                                  center_x+cell*0.1, center_y+cell*0.1,
-                                  fill='red', outline='red')
+            dot_radius = max(2, cell * 0.1)
+            self.canvas.create_oval(center_x-dot_radius, center_y-dot_radius,
+                                  center_x+dot_radius, center_y+dot_radius,
+                                  fill='red', outline='red', tags='end_icon')
 
     def pixel_to_cell(self, x, y):
         """Convert canvas x,y to grid cell indices."""
@@ -297,12 +309,35 @@ class PathVisualizerApp(ctk.CTk):
         # do not allow setting start on a wall
         if self.grid_data is not None and self.grid_data[r][c] == 1:
             return
+            
+        # Delete all existing start icons first
+        self.canvas.delete('start_icon')
+        
         # reset previous start (if different from end)
         if self.start is not None and self.start != self.end:
-            self.canvas.itemconfig(self.cells[self.start], fill='white')
+            # Restore original cell color
+            self.canvas.itemconfig(self.cells[self.start], 
+                                 fill='black' if self.grid_data and self.grid_data[self.start[0]][self.start[1]] == 1 else 'white')
+        
         self.start = (r, c)
-        # Redraw grid to update icons
-        self.draw_grid(self.grid_size)
+        # Update start position without redrawing entire grid
+        if self.start in self.cells:
+            x = self.pad_x + self.start[1] * self.cell_size
+            y = self.pad_y + self.start[0] * self.cell_size
+            # Clear previous start icon area
+            self.canvas.create_rectangle(x, y, x + self.cell_size, y + self.cell_size, 
+                                      fill='white', outline='gray', tags='start_icon')
+            # Draw flag pole
+            self.canvas.create_line(x + self.cell_size*0.2, y + self.cell_size*0.2, 
+                                  x + self.cell_size*0.2, y + self.cell_size*0.8, 
+                                  fill='black', width=2, tags='start_icon')
+            # Draw flag
+            points = [
+                x + self.cell_size*0.2, y + self.cell_size*0.2,  # pole top
+                x + self.cell_size*0.7, y + self.cell_size*0.4,  # flag tip
+                x + self.cell_size*0.2, y + self.cell_size*0.6   # pole middle
+            ]
+            self.canvas.create_polygon(points, fill='green', outline='black', tags='start_icon')
 
     def on_canvas_right_click(self, event):
         """Handle right-click to set end point."""
@@ -312,26 +347,98 @@ class PathVisualizerApp(ctk.CTk):
         # do not allow setting end on a wall
         if self.grid_data is not None and self.grid_data[r][c] == 1:
             return
+            
+        # Delete all existing end icons first
+        self.canvas.delete('end_icon')
+        
         # reset previous end (if different from start)
         if self.end is not None and self.end != self.start:
-            self.canvas.itemconfig(self.cells[self.end], fill='white')
+            # Restore original cell color
+            self.canvas.itemconfig(self.cells[self.end], 
+                                 fill='black' if self.grid_data and self.grid_data[self.end[0]][self.end[1]] == 1 else 'white')
+        
         self.end = (r, c)
-        # Redraw grid to update icons
-        self.draw_grid(self.grid_size)
+        # Update end position without redrawing entire grid
+        if self.end in self.cells:
+            x = self.pad_x + self.end[1] * self.cell_size
+            y = self.pad_y + self.end[0] * self.cell_size
+            # Clear previous end icon area
+            self.canvas.create_rectangle(x, y, x + self.cell_size, y + self.cell_size, 
+                                      fill='white', outline='gray', tags='end_icon')
+            center_x = x + self.cell_size/2
+            center_y = y + self.cell_size/2
+            
+            # Draw 3 concentric circles
+            radius = self.cell_size * 0.4
+            for i in range(3):
+                r = radius * (1 - i * 0.2)
+                if r > 1:  # Only draw if radius is greater than 1 pixel
+                    self.canvas.create_oval(center_x-r, center_y-r, 
+                                         center_x+r, center_y+r, 
+                                         outline='red', width=2, tags='end_icon')
+            
+            # Draw center dot
+            dot_radius = max(2, self.cell_size * 0.1)
+            self.canvas.create_oval(center_x-dot_radius, center_y-dot_radius,
+                                  center_x+dot_radius, center_y+dot_radius,
+                                  fill='red', outline='red', tags='end_icon')
 
     def on_generate(self):
         """Generate a maze and draw walls."""
         n = self.grid_size
+        
+        # Reset start and end points
+        self.start = None
+        self.end = None
+        # Delete all existing start/end icons
+        self.canvas.delete('start_icon')
+        self.canvas.delete('end_icon')
+        
+        # Generate new maze
         self.grid_data = logic.generate_maze(n, self.combo_maze.get(), self.combo_variant.get())
-        # thêm vòng kín dọc theo đường đi start–end để tạo nhiều lối
-        if hasattr(self, 'start') and hasattr(self, 'end') and self.start is not None and self.end is not None:
-            # loops=3 để đảm bảo ít nhất một số đường song song
-            self.grid_data = logic.add_targeted_loops(self.grid_data, self.start, self.end, loops=3)
+        
+        # Draw the maze
         for (r, c), rect in self.cells.items():
             color = 'black' if self.grid_data[r][c] == 1 else 'white'
             self.canvas.itemconfig(rect, fill=color)
-        # Redraw grid to update icons
-        self.draw_grid(self.grid_size)
+            
+        # Reset metrics
+        self.visited_count = 0
+        self.path_length = 0
+        self.lbl_visited.configure(text='0')
+        self.lbl_path_length.configure(text='0')
+        self.lbl_time.configure(text='0.00')
+        
+        # Vẽ lại các icon start và end
+        if self.start:
+            x = self.pad_x + self.start[1] * self.cell_size
+            y = self.pad_y + self.start[0] * self.cell_size
+            # Draw flag pole
+            self.canvas.create_line(x + self.cell_size*0.2, y + self.cell_size*0.2, 
+                                  x + self.cell_size*0.2, y + self.cell_size*0.8, 
+                                  fill='black', width=2)
+            # Draw flag
+            points = [
+                x + self.cell_size*0.2, y + self.cell_size*0.2,  # pole top
+                x + self.cell_size*0.7, y + self.cell_size*0.4,  # flag tip
+                x + self.cell_size*0.2, y + self.cell_size*0.6   # pole middle
+            ]
+            self.canvas.create_polygon(points, fill='green', outline='black')
+            
+        if self.end:
+            x = self.pad_x + self.end[1] * self.cell_size
+            y = self.pad_y + self.end[0] * self.cell_size
+            center_x = x + self.cell_size/2
+            center_y = y + self.cell_size/2
+            # Draw concentric circles
+            for r in range(int(self.cell_size*0.4), 0, -int(self.cell_size*0.1)):
+                self.canvas.create_oval(center_x-r, center_y-r, 
+                                     center_x+r, center_y+r, 
+                                     outline='red', width=2)
+            # Draw center dot
+            self.canvas.create_oval(center_x-self.cell_size*0.1, center_y-self.cell_size*0.1,
+                                  center_x+self.cell_size*0.1, center_y+self.cell_size*0.1,
+                                  fill='red', outline='red')
 
     def bfs_generator(self, grid, start, goal):
         from collections import deque
@@ -452,50 +559,44 @@ class PathVisualizerApp(ctk.CTk):
             yield 'path', cell
 
     def step(self):
+        if not getattr(self, 'stepping', True):
+            return
         try:
             typ, cell = next(self.step_gen)
             if typ == 'visit':
-                # increment visited count
                 self.visited_count += 1
                 if cell != self.start and cell != self.end:
                     self.canvas.itemconfig(self.cells[cell], fill='#ADD8E6')
-                # update visited count and elapsed time
                 self.lbl_visited.configure(text=str(self.visited_count))
                 self.lbl_time.configure(text=f"{time.time() - self.start_time:.2f}")
-            else:  # 'path'
-                # increment path length count
+            else:
                 self.path_length += 1
                 if cell != self.start and cell != self.end:
                     self.canvas.itemconfig(self.cells[cell], fill='blue')
-                # update path length and elapsed time
                 self.lbl_path_length.configure(text=str(self.path_length))
                 self.lbl_time.configure(text=f"{time.time() - self.start_time:.2f}")
-            # schedule next step according to speed slider
             self.after(self.delay, self.step)
         except StopIteration:
-            # final update of metrics
             elapsed = time.time() - self.start_time
             self.lbl_visited.configure(text=str(self.visited_count))
             self.lbl_path_length.configure(text=str(self.path_length))
             self.lbl_time.configure(text=f"{elapsed:.2f}")
+            self.stepping = False
             return
 
     def start_pathfinding(self):
-        """Animate pathfinding: explore then draw path."""
-        # initialize metrics
         self.visited_count = 0
         self.path_length = 0
         self.start_time = time.time()
+        self.stepping = True
         try:
             n = self.grid_size
-            # reset to maze or empty
             for (r, c), rect in self.cells.items():
                 if self.grid_data is not None:
                     color = 'black' if self.grid_data[r][c] == 1 else 'white'
                 else:
                     color = 'white'
                 self.canvas.itemconfig(rect, fill=color)
-            # Redraw grid to update icons
             self.draw_grid(self.grid_size)
             grid = self.grid_data if self.grid_data is not None else [[0] * n for _ in range(n)]
             algo = self.combo_algo.get()
@@ -508,18 +609,16 @@ class PathVisualizerApp(ctk.CTk):
             else:
                 heur = self.combo_heur.get()
                 self.step_gen = self.astar_generator(grid, self.start, self.end, heur)
-            # start animation with speed-based delay
             self.after(self.delay, self.step)
         except Exception as e:
             print('Error in start_pathfinding:', e)
 
     def on_reset(self):
-        """Reset to the initial empty grid, clearing any generated maze."""
-        # clear maze data and start/end
+        # Dừng animation nếu đang dò đường
+        self.stepping = False
         self.grid_data = None
         self.start = None
         self.end = None
-        # redraw an empty grid
         self.draw_grid(self.grid_size)
 
     def get_weighted_path(self, grid, start, goal, heuristic):
@@ -543,8 +642,7 @@ class PathVisualizerApp(ctk.CTk):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         mapping = {
             'EcoBot Navigator': 'WOM_MAZE_ECOBOT_UI.py',
-            'Mud Maze': 'WOM_MAZE_MUD_UI.py',
-            'Blind Maze': 'WOM_MAZE_BLIND_UI.py'
+            'Mud Maze': 'WOM_MAZE_MUD_UI.py'
         }
         script_name = mapping.get(variant)
         if script_name:

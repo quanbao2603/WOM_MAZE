@@ -2,18 +2,17 @@ import random
 import heapq
 from collections import deque
 
-
+# --- Tiện ích cho thuật toán tìm đường ---
 def get_neighbors(pos, n):
-    """Return 4-direction neighbors within grid bounds."""
+    """Trả về các ô lân cận 4 hướng trong phạm vi lưới."""
     r, c = pos
     for dr, dc in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
         nr, nc = r + dr, c + dc
         if 0 <= nr < n and 0 <= nc < n:
             yield (nr, nc)
 
-
 def get_neighbors_cost(pos, n):
-    """Return neighbors and movement cost (8-direction with diagonals)."""
+    """Trả về các ô lân cận 8 hướng và chi phí di chuyển."""
     r, c = pos
     for dr, dc in [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)]:
         nr, nc = r + dr, c + dc
@@ -21,9 +20,8 @@ def get_neighbors_cost(pos, n):
             cost = 1 if dr == 0 or dc == 0 else (2**0.5)
             yield (nr, nc), cost
 
-
 def get_heuristic(a, b, method):
-    """Compute heuristic distance between a and b using the specified method."""
+    """Tính heuristic giữa hai điểm a, b theo phương pháp chỉ định."""
     dx = abs(a[0] - b[0])
     dy = abs(a[1] - b[1])
     if method == 'Euclidean':
@@ -41,9 +39,9 @@ def get_heuristic(a, b, method):
         return (dx*dx + dy*dy) ** 0.5 * (1 + 1e-3)
     return 0
 
-
+# --- Thuật toán tìm đường ---
 def bfs(grid, start, goal):
-    """Breadth-First Search on a binary grid."""
+    """Tìm đường theo chiều rộng (BFS) trên lưới nhị phân."""
     n = len(grid)
     visited = {start}
     parent = {start: None}
@@ -66,9 +64,8 @@ def bfs(grid, start, goal):
         node = parent[node]
     return path[::-1]
 
-
 def dfs(grid, start, goal):
-    """Depth-First Search on a binary grid."""
+    """Tìm đường theo chiều sâu (DFS) trên lưới nhị phân."""
     n = len(grid)
     visited = set()
     parent = {start: None}
@@ -93,9 +90,8 @@ def dfs(grid, start, goal):
         node = parent[node]
     return path[::-1]
 
-
 def dijkstra(grid, start, goal):
-    """Dijkstra's algorithm on a weighted grid."""
+    """Tìm đường ngắn nhất theo thuật toán Dijkstra trên lưới có trọng số."""
     n = len(grid)
     dist = {start: 0}
     parent = {}
@@ -126,9 +122,8 @@ def dijkstra(grid, start, goal):
     path.append(start)
     return path[::-1]
 
-
 def astar(grid, start, goal, heuristic):
-    """A* search on a weighted grid with a chosen heuristic."""
+    """Tìm đường ngắn nhất theo thuật toán A* với heuristic tuỳ chọn."""
     n = len(grid)
     g_score = {start: 0}
     f_score = {start: get_heuristic(start, goal, heuristic)}
@@ -162,39 +157,32 @@ def astar(grid, start, goal, heuristic):
     path.append(start)
     return path[::-1]
 
-
+# --- Sinh mê cung ---
 def add_loops(grid, n, loops):
-    """Randomly remove walls between corridors to create loops in the maze."""
-    # consider only interior walls
+    """Thêm các vòng lặp để tạo nhiều đường đi hơn."""
     walls = [(r, c) for r in range(1, n-1) for c in range(1, n-1) if grid[r][c] == 1]
     random.shuffle(walls)
     removed = 0
     for r, c in walls:
         if removed >= loops:
             break
-        # if vertical wall between two open cells
-        if grid[r-1][c] == 0 and grid[r+1][c] == 0:
-            grid[r][c] = 0
-            removed += 1
-        # if horizontal wall between two open cells
-        elif grid[r][c-1] == 0 and grid[r][c+1] == 0:
+        if (grid[r-1][c] == 0 and grid[r+1][c] == 0) or \
+           (grid[r][c-1] == 0 and grid[r][c+1] == 0):
             grid[r][c] = 0
             removed += 1
     return grid
 
-
 def add_targeted_loops(grid, start, end, loops=1):
-    """Add loops specifically along the unique start-end path to create alternative routes."""
-    # find the unique path using BFS
+    """Thêm vòng lặp dọc theo đường đi duy nhất từ start đến end."""
     path = bfs(grid, start, end)
+    if not path:
+        return grid
     n = len(grid)
     candidates = []
-    # look for wall cells adjacent to two distant nodes on the path
     for idx, (r, c) in enumerate(path):
         for dr, dc in [(1,0),(-1,0),(0,1),(0,-1)]:
             nr, nc = r + dr, c + dc
             if 0 <= nr < n and 0 <= nc < n and grid[nr][nc] == 1:
-                # collect path neighbors of this wall
                 neigh = []
                 for dr2, dc2 in [(1,0),(-1,0),(0,1),(0,-1)]:
                     ar, ac = nr + dr2, nc + dc2
@@ -207,9 +195,8 @@ def add_targeted_loops(grid, start, end, loops=1):
         grid[r][c] = 0
     return grid
 
-
 def maze_recursive_backtracking(n):
-    """Recursive backtracking maze generation."""
+    """Sinh mê cung bằng đệ quy quay lui."""
     grid = [[1] * n for _ in range(n)]
     def carve(r, c):
         dirs = [(2, 0), (-2, 0), (0, 2), (0, -2)]
@@ -220,18 +207,17 @@ def maze_recursive_backtracking(n):
                 grid[r + dr//2][c + dc//2] = 0
                 grid[nr][nc] = 0
                 carve(nr, nc)
-    # start at (1,1) or (0,0) if small
-    sr = 1 if n > 2 else 0
-    sc = 1 if n > 2 else 0
+    sr = random.randrange(0, n-2, 2)
+    sc = random.randrange(0, n-2, 2)
     grid[sr][sc] = 0
     carve(sr, sc)
     return grid
 
-
 def maze_prim(n):
-    """Prim's algorithm maze generation."""
+    """Sinh mê cung bằng thuật toán Prim."""
     grid = [[1] * n for _ in range(n)]
-    sr, sc = random.randrange(1, n, 2), random.randrange(1, n, 2)
+    sr = random.randrange(0, n-2, 2)
+    sc = random.randrange(0, n-2, 2)
     grid[sr][sc] = 0
     walls = []
     for dr, dc in [(2, 0), (-2, 0), (0, 2), (0, -2)]:
@@ -250,9 +236,8 @@ def maze_prim(n):
                     walls.append((nr, nc, (r, c)))
     return grid
 
-
 def maze_kruskal(n):
-    """Kruskal's algorithm maze generation."""
+    """Sinh mê cung bằng thuật toán Kruskal."""
     parent = {}
     def find(x):
         while parent[x] != x:
@@ -261,7 +246,7 @@ def maze_kruskal(n):
         return x
     def union(a, b):
         parent[find(a)] = find(b)
-    cells = [(r, c) for r in range(1, n, 2) for c in range(1, n, 2)]
+    cells = [(r, c) for r in range(0, n-1, 2) for c in range(0, n-1, 2)]
     for cell in cells:
         parent[cell] = cell
     edges = []
@@ -282,76 +267,58 @@ def maze_kruskal(n):
             grid[(ar+br)//2][(ac+bc)//2] = 0
     return grid
 
-
 def maze_eller(n):
-    """Eller's algorithm maze generation, row-by-row perfect maze."""
-    # initialize grid full of walls
+    """Sinh mê cung bằng thuật toán Eller (theo từng hàng)."""
     grid = [[1] * n for _ in range(n)]
-    # early exit for small grids
     if n < 3:
         return [[0] * n for _ in range(n)]
-    # cell positions are odd indices
-    cell_rows = [i for i in range(n) if i % 2 == 1]
-    cell_cols = [i for i in range(n) if i % 2 == 1]
+    cell_rows = [i for i in range(n) if i % 2 == 0]
+    cell_cols = [i for i in range(n) if i % 2 == 0]
     sets = {}
     next_set_id = 1
-    # process each cell row
     for row_idx, y in enumerate(cell_rows):
-        # open cells and assign sets
         for x in cell_cols:
             grid[y][x] = 0
             if (y, x) not in sets:
                 sets[(y, x)] = next_set_id
                 next_set_id += 1
         is_last = (row_idx == len(cell_rows) - 1)
-        # join horizontally
         for i in range(len(cell_cols) - 1):
             x = cell_cols[i]
             x2 = cell_cols[i+1]
             if sets[(y, x)] != sets[(y, x2)]:
                 if is_last or random.choice([True, False]):
-                    # carve horizontal wall
                     grid[y][x+1] = 0
                     old_id = sets[(y, x2)]
                     new_id = sets[(y, x)]
-                    # merge sets in this row
                     for xc in cell_cols:
                         if sets.get((y, xc)) == old_id:
                             sets[(y, xc)] = new_id
-        # carve down vertically except last row
         if not is_last:
             next_y = cell_rows[row_idx + 1]
-            # group by set id
             groups = {}
             for x in cell_cols:
                 sid = sets[(y, x)]
                 groups.setdefault(sid, []).append(x)
             new_sets = {}
-            # carve vertical connections
             for sid, xs in groups.items():
-                # choose at least one cell per group
                 choices = [x for x in xs if random.choice([True, False])]
                 if not choices:
                     choices = [random.choice(xs)]
                 for x in choices:
-                    # carve vertical wall
                     grid[y+1][x] = 0
-                    # open cell below
                     grid[next_y][x] = 0
                     new_sets[(next_y, x)] = sid
-            # assign new sets for next row cells
             for x in cell_cols:
                 key = (next_y, x)
                 if key not in new_sets:
                     new_sets[key] = next_set_id
                     next_set_id += 1
                     grid[next_y][x] = 0
-            # update sets mapping to only next row
             sets = new_sets
     return grid
 
-
-# Mapping of maze generation algorithms to their functions
+# --- Bảng ánh xạ các thuật toán sinh mê cung ---
 MAZE_GENERATORS = {
     'Recursive Backtracking': maze_recursive_backtracking,
     'Prim': maze_prim,
@@ -359,21 +326,18 @@ MAZE_GENERATORS = {
     'Eller': maze_eller
 }
 
-
 def generate_maze(n, algorithm='Recursive Backtracking', variant=None):
     """
-    Generate a maze of size n x n.
-    algorithm: one of ['Recursive Backtracking','Prim','Kruskal','Eller'].
-    variant: optional variant name (stub for now).
-    Returns a 2D grid with 0=open paths, 1=walls.
+    Sinh mê cung kích thước n x n.
+    algorithm: ['Recursive Backtracking','Prim','Kruskal','Eller'].
+    variant: tuỳ chọn biến thể (chưa dùng).
+    Trả về lưới 2D với 0=lối đi, 1=tường.
     """
-    # select generator function
     try:
         gen_func = MAZE_GENERATORS[algorithm]
     except KeyError:
         raise ValueError(f'Unknown algorithm: {algorithm}')
-    # generate perfect maze
     grid = gen_func(n)
-    # add loops to create extra paths
-    grid = add_loops(grid, n, loops=n)
+    loops = max(1, n // 10)
+    grid = add_loops(grid, n, loops)
     return grid
