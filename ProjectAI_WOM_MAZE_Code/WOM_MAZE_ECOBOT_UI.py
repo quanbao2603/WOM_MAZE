@@ -662,28 +662,29 @@ class EcoBotNavigatorApp(ctk.CTk):
                     tentative_g -= current_efficiency * 0.5
                 if v == goal:
                     tentative_g -= new_fuel * 0.3
-                if v in g_score and tentative_g >= g_score[v]:
+                if v in closed:
                     continue
-                came_from[v] = current
-                g_score[v] = tentative_g
-                fuel_at_node[v] = new_fuel
-                fuel_efficiency[v] = current_efficiency
-                if is_direct_path:
-                    h_score = logic.get_heuristic(v, goal, 'Manhattan')
-                else:
-                    h_score = logic.get_heuristic(v, goal, 'Euclidean')
-                    if terrain != TERRAIN_TYPES['DEFAULT']:
-                        h_score *= (1 + terrain['fuel_cost'] * 0.1)
-                    h_score *= (1 - current_efficiency * 0.2)
-                    if new_fuel < self.max_fuel * 0.3:
-                        nearest_station_dist = float('inf')
-                        for station in self.fuel_stations:
-                            dist = logic.get_heuristic(v, station, 'Manhattan')
-                            nearest_station_dist = min(nearest_station_dist, dist)
-                        if nearest_station_dist != float('inf'):
-                            h_score *= (1 + nearest_station_dist * 0.1)
-                f_score[v] = tentative_g + h_score
-                heapq.heappush(open_set, (f_score[v], v))
+                if v not in g_score or tentative_g < g_score[v]:
+                    came_from[v] = current
+                    g_score[v] = tentative_g
+                    fuel_at_node[v] = new_fuel
+                    fuel_efficiency[v] = current_efficiency
+                    if is_direct_path:
+                        h_score = logic.get_heuristic(v, goal, 'Manhattan')
+                    else:
+                        h_score = logic.get_heuristic(v, goal, 'Euclidean')
+                        if terrain != TERRAIN_TYPES['DEFAULT']:
+                            h_score *= (1 + terrain['fuel_cost'] * 0.1)
+                        h_score *= (1 - current_efficiency * 0.2)
+                        if new_fuel < self.max_fuel * 0.3:
+                            nearest_station_dist = float('inf')
+                            for station in self.fuel_stations:
+                                dist = logic.get_heuristic(v, station, 'Manhattan')
+                                nearest_station_dist = min(nearest_station_dist, dist)
+                            if nearest_station_dist != float('inf'):
+                                h_score *= (1 + nearest_station_dist * 0.1)
+                    f_score[v] = tentative_g + h_score
+                    heapq.heappush(open_set, (f_score[v], v))
         # Nếu không tìm được đường đi thì dừng generator ngay
         if goal not in came_from and start != goal:
             return
